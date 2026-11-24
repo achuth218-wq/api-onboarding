@@ -1,0 +1,10 @@
+add-plugins:
+  - selectors:
+      - $.services[*]
+    plugins:
+      - name: request-size-limiting
+        enabled: true
+        config:
+          allowed_payload_size: 1
+          size_unit: megabytes
+          require_content_length: false

@@ -1,0 +1,21 @@
+role = data_plane
+database = off
+konnect_mode = on
+vitals = off
+
+cluster_mtls = pki
+cluster_control_plane = __KONNECT_CONTROL_PLANE_ENDPOINT__:443
+cluster_server_name = __KONNECT_CONTROL_PLANE_SERVER_NAME__
+cluster_telemetry_endpoint = __KONNECT_TELEMETRY_ENDPOINT__:443
+cluster_telemetry_server_name = __KONNECT_TELEMETRY_SERVER_NAME__
+
+# In PKI mode, present the leaf cert plus intermediate chain if your CA uses one.
+cluster_cert = /etc/kong/mtls/tls-chain.crt
+cluster_cert_key = /etc/kong/mtls/tls.key
+
+lua_ssl_trusted_certificate = system
+nginx_worker_processes = auto
+
+proxy_listen = 0.0.0.0:8000 reuseport backlog=16384, 0.0.0.0:8443 ssl reuseport backlog=16384
+admin_listen = 0.0.0.0:8001, 0.0.0.0:8444 ssl
+status_listen = 0.0.0.0:8100
