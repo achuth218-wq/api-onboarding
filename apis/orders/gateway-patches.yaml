@@ -7,7 +7,7 @@ patches:
   - selectors:
       - $.services[*]
     values:
-      host: orders.internal.example.com
+      host: orders.internal
       protocol: https
       port: 443
       # Avoid retrying non-idempotent order creation automatically.
