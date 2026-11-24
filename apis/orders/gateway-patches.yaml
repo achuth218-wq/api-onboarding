@@ -3,7 +3,7 @@ patches:
       - $
     values:
       _konnect:
-        control_plane_name: '${{ env "DECK_KONNECT_CONTROL_PLANE_NAME" }}'
+        control_plane_name: test-api
   - selectors:
       - $.services[*]
     values:
