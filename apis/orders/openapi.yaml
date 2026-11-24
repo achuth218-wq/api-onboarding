@@ -6,7 +6,7 @@ info:
 # Keep this identifier stable across deployments.
 x-kong-name: orders-api
 servers:
-  - url: https://orders.internal.example.com
+  - url: https://orders.internal.com
     description: Placeholder; the pipeline replaces the upstream host per environment.
 security:
   - ApiKeyAuth: []
