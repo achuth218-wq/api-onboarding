@@ -1,0 +1,250 @@
+
+openapi: 3.0.3
+
+info:
+  title: Product Inventory API
+  version: 1.0.0
+  description: API contract for managing product inventory through Kong Konnect.
+
+x-kong-name: inventory-api
+
+servers:
+  - url: https://inventory.internal.com
+    description: Placeholder upstream URL replaced by the deployment pipeline.
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Inventory
+    description: Create, retrieve, update and delete inventory products.
+
+paths:
+  /v1/products:
+    get:
+      operationId: listProducts
+      summary: List all products
+      tags: [Inventory]
+      responses:
+        "200":
+          description: Products returned successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      operationId: createProduct
+      summary: Create a new product
+      tags: [Inventory]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProduct"
+      responses:
+        "201":
+          description: Product created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Product SKU already exists.
+        "413":
+          description: Request body exceeds the configured size limit.
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /v1/products/{productId}:
+    parameters:
+      - name: productId
+        in: path
+        required: true
+        description: Unique identifier of the product.
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      operationId: getProduct
+      summary: Get a product by ID
+      tags: [Inventory]
+      responses:
+        "200":
+          description: Product returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+    put:
+      operationId: updateProduct
+      summary: Update an existing product
+      tags: [Inventory]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProduct"
+      responses:
+        "200":
+          description: Product updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Product SKU already exists.
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+    delete:
+      operationId: deleteProduct
+      summary: Delete a product
+      tags: [Inventory]
+      responses:
+        "204":
+          description: Product deleted successfully.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: apikey
+
+  schemas:
+    CreateProduct:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - sku
+        - quantity
+        - price
+      properties:
+        name:
+          type: string
+          minLength: 1
+          example: Wireless Headphones
+        sku:
+          type: string
+          minLength: 1
+          example: SKU-1001
+        category:
+          type: string
+          example: Electronics
+        quantity:
+          type: integer
+          minimum: 0
+          example: 50
+        price:
+          type: number
+          format: double
+          minimum: 0
+          example: 2499.00
+        currency:
+          type: string
+          default: INR
+          pattern: "^[A-Z]{3}$"
+          example: INR
+
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - sku
+        - quantity
+        - price
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        name:
+          type: string
+          example: Wireless Headphones
+        sku:
+          type: string
+          example: SKU-1001
+        category:
+          type: string
+          example: Electronics
+        quantity:
+          type: integer
+          minimum: 0
+          example: 50
+        price:
+          type: number
+          format: double
+          minimum: 0
+          example: 2499.00
+        currency:
+          type: string
+          example: INR
+        status:
+          type: string
+          enum:
+            - in_stock
+            - out_of_stock
+            - discontinued
+          example: in_stock
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+  responses:
+    Unauthorized:
+      description: API key is missing or invalid.
+
+    BadRequest:
+      description: Invalid request payload or parameters.
+
+    NotFound:
+      description: Requested product does not exist.
+
+    TooManyRequests:
+      description: Rate limit exceeded. Retry after the window resets.
+
+    InternalServerError:
+      description: An unexpected internal server error occurred.

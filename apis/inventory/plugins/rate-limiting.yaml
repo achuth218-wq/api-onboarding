@@ -1,0 +1,13 @@
+add-plugins:
+  - selectors:
+      - $.services[*]
+    plugins:
+      - name: rate-limiting
+        enabled: true
+        config:
+          minute: 100
+          limit_by: consumer
+          # Local counters are per data-plane node. Use Redis for a shared quota.
+          policy: local
+          fault_tolerant: false
+          hide_client_headers: false
