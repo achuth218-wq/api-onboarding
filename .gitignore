@@ -1,6 +1,4 @@
-.env
-certs/
-kong/kong.conf
 build/
 .venv-apiops/
 __pycache__/
+.env

@@ -1,6 +1,8 @@
 # Onboard an API into Kong Konnect with GitHub Actions
 
-This example deploys the Orders API's Gateway Service, three Routes, and four plugins into an existing Konnect control plane. Replace the sample contract with your API before deployment. The upstream application and a connected data plane must already exist.
+This example deploys the Orders API's Gateway Service, three Routes, and four plugins into your existing US-region Konnect control plane. Your local Docker data plane must already be connected to that control plane. Replace the sample contract with your API before deployment.
+
+GitHub Actions sends the API configuration to Konnect, which distributes it to the connected data plane. The runner does not need access to your local Docker daemon or local Admin API. This bundle contains API onboarding files only; it does not install or restart the data plane, generate certificates, or change Docker settings.
 
 ## Files
 
@@ -31,7 +33,7 @@ The rate limiter uses `local` counters, which are suitable for this self-managed
 
 ## Configure GitHub
 
-Create GitHub environments named `development`, `staging`, and `production` under **Settings → Environments**. Configure these values in each environment:
+Start by creating a GitHub environment named `development` under **Settings → Environments**. Set its control-plane name to the existing US-region control plane your local Docker data plane is connected to. Configure these values:
 
 | Type | Name | Value |
 | --- | --- | --- |
@@ -39,9 +41,11 @@ Create GitHub environments named `development`, `staging`, and `production` unde
 | Variable | `KONNECT_CONTROL_PLANE_NAME` | Exact name of the target control plane in the US region, for example `orders-development` |
 | Variable | `ORDERS_UPSTREAM_HOST` | Real upstream DNS hostname, without a scheme, port, or path |
 
-The workflow sets `DECK_KONNECT_ADDR` to `https://us.api.konghq.com` for development, staging, and production. You do not need a GitHub `KONNECT_ADDR` variable; any existing value is unused by this workflow. Use a distinct control plane in the US region for each environment. The US management API URL is separate from the `*.cp.khcp.konghq.com` data-plane connection endpoint in the root project's `.env` file.
+The workflow sets `DECK_KONNECT_ADDR` to `https://us.api.konghq.com`. You do not need a GitHub `KONNECT_ADDR` variable or a local `.env` file for this pipeline. The US management API URL is separate from the data-plane connection endpoint already configured in your Docker container.
 
-The upstream is assumed to serve HTTPS on port 443 and handle the full `/v1/orders...` path. Change `gateway-patches.yaml` if your backend uses different settings. Its TLS certificate must be trusted by the data plane. The workflow rejects the example upstream hostname until you provide a real one.
+The workflow also supports optional `staging` and `production` GitHub environments. Configure these only when you have corresponding target control planes and connected data planes; the pipeline does not create them. Use a distinct control plane in the US region for each environment.
+
+Set `ORDERS_UPSTREAM_HOST` to the backend hostname reachable from your running Kong container. The upstream is assumed to serve HTTPS on port 443 and handle the full `/v1/orders...` path. Change `gateway-patches.yaml` if your local backend uses HTTP or another port. For HTTPS, its TLS certificate must be trusted by the data plane. The workflow rejects the example upstream hostname until you provide a real one.
 
 Restrict environment deployments to `main`. Configure required reviewers for `production` if you want GitHub to enforce approval before that job receives credentials. Environment protection is a repository setting and is not created by this workflow file.
 
