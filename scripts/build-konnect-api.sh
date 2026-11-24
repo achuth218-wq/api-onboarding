@@ -4,41 +4,64 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-export DECK_ANALYTICS=false
-export DECK_ORDERS_UPSTREAM_HOST="${DECK_ORDERS_UPSTREAM_HOST:-orders.internal.example.com}"
-export DECK_KONNECT_CONTROL_PLANE_NAME="${DECK_KONNECT_CONTROL_PLANE_NAME:-offline-validation}"
-mkdir -p build
+SERVICE="${1:-orders}"
+TARGET_ENVIRONMENT="${2:-development}"
+if [[ ! "$SERVICE" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ || "$SERVICE" == all ]]; then
+  echo "Use a service folder name such as orders or inventory." >&2
+  exit 1
+fi
+API_NAME="${SERVICE}-api"
+API_DIR="apis/$SERVICE"
+case "$TARGET_ENVIRONMENT" in
+  development) GATEWAY_FILE="$API_DIR/gateway-patches.yaml" ;;
+  staging|production) GATEWAY_FILE="$API_DIR/environments/$TARGET_ENVIRONMENT/gateway-patches.yaml" ;;
+  *) echo "Environment must be development, staging, or production." >&2; exit 1 ;;
+esac
+if [[ ! -f "$GATEWAY_FILE" ]]; then
+  echo "Create $GATEWAY_FILE with static settings for $TARGET_ENVIRONMENT." >&2
+  exit 1
+fi
+OUTPUT_DIR="build/$TARGET_ENVIRONMENT/$SERVICE"
 
-python3 -m openapi_spec_validator apis/orders/openapi.yaml
+export DECK_ANALYTICS=false
+mkdir -p "$OUTPUT_DIR"
+
+# Catch a copied spec that still has another service's identity before deploying.
+python3 - "$API_DIR/openapi.yaml" "$API_NAME" <<'PY'
+import sys
+import yaml
+with open(sys.argv[1]) as source:
+    spec = yaml.safe_load(source)
+if spec.get('x-kong-name') != sys.argv[2]:
+    raise SystemExit(f"Set x-kong-name to {sys.argv[2]} in {sys.argv[1]}")
+PY
+
+python3 -m openapi_spec_validator "$API_DIR/openapi.yaml"
 
 # Authentication is supplied by the separate key-auth plugin file. Do not use
 # --generate-security, which generates OIDC plugins from supported OAS schemes.
 deck file openapi2kong \
-  --spec apis/orders/openapi.yaml \
-  --uuid-base orders-api \
-  --output-file build/orders-api.base.yaml
+  --spec "$API_DIR/openapi.yaml" \
+  --uuid-base "$API_NAME" \
+  --output-file "$OUTPUT_DIR/base.yaml"
 
 deck file patch \
-  --state build/orders-api.base.yaml \
-  --output-file build/orders-api.patched.yaml \
-  apis/orders/gateway-patches.yaml
+  --state "$OUTPUT_DIR/base.yaml" \
+  --output-file "$OUTPUT_DIR/patched.yaml" \
+  "$GATEWAY_FILE"
 
 deck file add-plugins \
-  --state build/orders-api.patched.yaml \
-  --output-file build/orders-api.plugins.yaml \
-  apis/orders/plugins/*.yaml
+  --state "$OUTPUT_DIR/patched.yaml" \
+  --output-file "$OUTPUT_DIR/plugins.yaml" \
+  "$API_DIR"/plugins/*.yaml
 
 # Tag after adding plugins so services, routes AND plugins share ownership.
 deck file add-tags \
-  --state build/orders-api.plugins.yaml \
-  --output-file build/orders-api.template.yaml \
-  api:orders-api managed-by:github-actions
+  --state "$OUTPUT_DIR/plugins.yaml" \
+  --output-file "$OUTPUT_DIR/kong.yaml" \
+  "api:$API_NAME" managed-by:github-actions
 
-deck file render build/orders-api.template.yaml \
-  --populate-env-vars --output-file build/orders-api.yaml
-# Validate and deploy the template directly: render produces an inspection copy
-# and removes entity IDs. Gateway commands resolve the template at runtime.
-deck file validate build/orders-api.template.yaml --konnect-compatibility
+# Deploy this state directly to retain stable Service and Route IDs.
+deck file validate "$OUTPUT_DIR/kong.yaml" --konnect-compatibility
 
-echo "Validated API configuration: build/orders-api.yaml"
-echo "Deployment template: build/orders-api.template.yaml"
+echo "Validated API configuration: $OUTPUT_DIR/kong.yaml"
